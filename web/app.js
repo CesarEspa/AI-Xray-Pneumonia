@@ -59,8 +59,9 @@
     return buf;
   }
 
+  // Las sesiones se guardan por archivo: "Tu modelo" comparte la base congelada (model/base.onnx).
   async function getSession(m, statusPrefix = '') {
-    if (sessions.has(m.key)) return sessions.get(m.key);
+    if (sessions.has(m.file)) return sessions.get(m.file);
     const bar = $('progress');
     bar.classList.remove('done');
     const buf = await fetchModel(m, (got, total) => {
@@ -69,14 +70,14 @@
     });
     $('status').textContent = `${statusPrefix}Preparando ${m.short}…`;
     const s = await ort.InferenceSession.create(buf, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
-    sessions.set(m.key, s);
+    sessions.set(m.file, s);
     bar.classList.add('done');
     return s;
   }
 
-  async function releaseExcept(keep) {
+  async function releaseExcept(keepFiles) {
     for (const [k, s] of sessions) {
-      if (!keep.includes(k)) { try { await s.release(); } catch (_) { /* ya liberada */ } sessions.delete(k); }
+      if (!keepFiles.includes(k)) { try { await s.release(); } catch (_) { /* ya liberada */ } sessions.delete(k); }
     }
   }
 
@@ -143,10 +144,23 @@
   }
 
   /* ---------- inferencia ---------- */
-  async function infer(session, input) {
+  async function infer(m, session, input) {
     const t0 = performance.now();
     const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', input, [1, SIZE, SIZE, 3]) });
     const ts = Object.values(out);
+    if (m.head) {
+      // "Tu modelo": base congelada (7x7x2048) + la cabeza entrenada en el laboratorio.
+      // Con GlobalAveragePooling -> Dense, el logit es el promedio del mapa de activación más el sesgo.
+      const f = ts[0].data, { w, b } = m.head, D = w.length;
+      const cam = new Float32Array(49);
+      let sum = 0;
+      for (let c = 0; c < 49; c++) {
+        let s = 0;
+        for (let k = 0; k < D; k++) s += f[c * D + k] * w[k];
+        cam[c] = s; sum += s;
+      }
+      return { prob: 1 / (1 + Math.exp(-(sum / 49 + b))), cam, ms: performance.now() - t0 };
+    }
     return {
       prob: ts.find((t) => t.data.length === 1).data[0],
       cam: Float32Array.from(ts.find((t) => t.data.length === 49).data),
@@ -158,7 +172,7 @@
     const m = key ? models.find((x) => x.key === key) : current;
     const img = await decode(blob);
     const input = preprocess(img.data, img.w, img.h);
-    return { img, input, ...(await infer(await getSession(m), input)) };
+    return { img, input, ...(await infer(m, await getSession(m), input)) };
   }
 
   /* ---------- presentación ---------- */
@@ -269,7 +283,7 @@
       const img = await decode(blob);
       const input = preprocess(img.data, img.w, img.h);
       last = { input, img, example };
-      show({ img, ...(await infer(await getSession(current), input)) }, example);
+      show({ img, ...(await infer(current, await getSession(current), input)) }, example);
       $('status').textContent = `${current.short} listo`;
     } catch (e) {
       console.error(e);
@@ -283,7 +297,7 @@
     if (!last) return;
     setBusy(true);
     try {
-      const r = await infer(await getSession(current), last.input);
+      const r = await infer(current, await getSession(current), last.input);
       show({ img: last.img, ...r }, last.example && { ...last.example, random: false });
       $('status').textContent = `${current.short} listo`;
     } finally { setBusy(false); }
@@ -309,7 +323,7 @@
     setBusy(true);
     try {
       await getSession(current);
-      await releaseExcept([current.key]);
+      await releaseExcept([current.file]);
       $('status').textContent = `${current.short} listo`;
     } catch (e) {
       console.error(e);
@@ -324,7 +338,7 @@
     const table = $('cmpTable');
     const body = table.querySelector('tbody');
     body.innerHTML = '';
-    const pending = models.filter((m) => !sessions.has(m.key));
+    const pending = [...new Map(models.filter((m) => !sessions.has(m.file)).map((m) => [m.file, m])).values()];
     $('compareNote').textContent = pending.length
       ? `Descarga ${mb(pending.reduce((a, m) => a + m.size, 0))} la primera vez; después quedan guardados en tu navegador.`
       : '';
@@ -332,9 +346,9 @@
     try {
       for (const m of models) {
         const s = await getSession(m, 'Comparando · ');
-        const r = await infer(s, last.input);
+        const r = await infer(m, s, last.input);
         rows.push({ m, prob: r.prob });
-        if (m.key !== current.key) await releaseExcept([current.key]);   // uno a la vez para no agotar memoria
+        if (m.file !== current.file) await releaseExcept([current.file]);   // uno a la vez para no agotar memoria
       }
       for (const { m, prob } of rows) {
         const pos = prob >= m.threshold;
@@ -426,5 +440,18 @@
 
   init().catch((e) => { $('status').textContent = 'No se pudo cargar el modelo'; console.error(e); });
 
-  window.__aixray = { predict, ready: () => !!current && sessions.has(current.key), models: () => models };
+  // El laboratorio (lab.js) registra aquí el modelo que entrena el visitante.
+  function registerCustom(custom) {
+    models = models.filter((m) => m.key !== 'custom').concat([custom]);
+    const sel = $('modelSel');
+    let o = sel.querySelector('option[value="custom"]');
+    if (!o) { o = document.createElement('option'); o.value = 'custom'; sel.appendChild(o); }
+    o.textContent = `${custom.label} · F1 test ${fmt(custom.test.f1_score)}`;
+    $('compareBtn').textContent = `Comparar los ${models.length} modelos con esta imagen`;
+    sel.value = 'custom';
+    document.querySelector('.app').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return selectModel('custom');
+  }
+
+  window.__aixray = { predict, ready: () => !!current && sessions.has(current.file), models: () => models, registerCustom, fmt };
 })();

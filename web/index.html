@@ -21,6 +21,7 @@
 <header class="top">
   <a class="brand" href="https://cesarespa.github.io/CesarEspana-Portafolio/Analyst/analyst.html">César<span>España</span></a>
   <nav>
+    <a href="#laboratorio">Entrena tu modelo</a>
     <a href="#confianza">Qué tan confiable es</a>
     <a href="https://github.com/CesarEspa/AI-Xray-Pneumonia" target="_blank" rel="noopener">Código ↗</a>
   </nav>
@@ -96,6 +97,66 @@
     </div>
   </section>
 
+  <section class="lab" id="laboratorio">
+    <div class="trust-head">
+      <span class="label">Laboratorio</span>
+      <h2>Entrena tu<br><span>propio modelo.</span></h2>
+      <p class="lab-intro">Reproduce el Run 1 en tu navegador: la ResNet50 de ImageNet queda congelada y se entrena solo la última
+        capa (2.049 parámetros) con las 1.389 radiografías de entrenamiento. Elige las épocas y los hiperparámetros, mira cómo
+        aprende, y al final se mide en las mismas 302 imágenes de test que los modelos oficiales.</p>
+    </div>
+
+    <div class="lab-grid">
+      <div class="panel">
+        <div class="lab-controls">
+          <label class="field" for="epochs">Épocas · <span id="epochsVal">10</span></label>
+          <input type="range" id="epochs" min="1" max="100" value="10">
+          <label class="field" for="lr">Learning rate</label>
+          <select id="lr">
+            <option value="0.01">0,01 · muy alto</option>
+            <option value="0.001" selected>0,001 · el del Run 1</option>
+            <option value="0.0001">0,0001 · el del Run 2</option>
+          </select>
+          <label class="field" for="dropout">Dropout</label>
+          <select id="dropout">
+            <option value="0">0 · sin dropout</option>
+            <option value="0.3" selected>0,3 · el del Run 1</option>
+            <option value="0.5">0,5 · el del Run 2</option>
+          </select>
+          <label class="check"><input type="checkbox" id="early" checked> Parada temprana y reducción del learning rate, como en el proyecto</label>
+        </div>
+        <div class="lab-actions">
+          <button type="button" class="btn btn-solid" id="trainBtn" disabled>Entrenar</button>
+          <button type="button" class="btn" id="stopBtn" disabled>Detener</button>
+        </div>
+        <div class="progress lab-progress" aria-hidden="true"><i id="labBar"></i></div>
+        <p class="status lab-status" id="labStatus" aria-live="polite">Cargando las características de las 2.000 imágenes…</p>
+        <p class="note">Tarda segundos y no horas porque las características de ResNet50 ya están calculadas: solo se entrena la capa final.
+          A diferencia del Run 1 original, no hay aumento de datos, así que el resultado no es idéntico.</p>
+      </div>
+
+      <div class="panel">
+        <div class="charts">
+          <figure>
+            <figcaption>Pérdida por época <span class="key"><i class="k1"></i>entrenamiento <i class="k2"></i>validación</span></figcaption>
+            <canvas id="lossChart" width="560" height="220" role="img" aria-label="Curvas de pérdida de entrenamiento y validación"></canvas>
+          </figure>
+          <figure>
+            <figcaption>F1 en validación por época <span class="key"><i class="k2"></i>con umbral 0,5</span></figcaption>
+            <canvas id="f1Chart" width="560" height="160" role="img" aria-label="F1 de validación por época"></canvas>
+          </figure>
+        </div>
+        <div class="lab-result" id="labResult" hidden>
+          <h3>Tu modelo en el conjunto de test</h3>
+          <dl class="stats" id="labStats"></dl>
+          <p class="explain" id="labCompare"></p>
+          <button type="button" class="btn btn-solid" id="useBtn">Usar mi modelo para clasificar</button>
+          <p class="note" id="useNote">Necesita descargar la ResNet50 congelada (45 MB) la primera vez.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="trust" id="confianza">
     <div class="trust-head">
       <span class="label">Qué tan confiable es</span>
@@ -163,5 +224,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
 <script src="app.js"></script>
+<script src="lab.js"></script>
 </body>
 </html>
