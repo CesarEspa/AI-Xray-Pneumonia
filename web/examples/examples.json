@@ -1,0 +1,48 @@
+{
+  "threshold": 0.5853266716003418,
+  "verification": "Comprobado: en el navegador da la misma probabilidad que el modelo de TensorFlow original (diferencia máxima de 0,006 en las 302 imágenes de test y ninguna decisión distinta). Las cifras de arriba son las del proyecto; con las JPEG originales del dataset, en lugar de las copias reducidas que se usaron al entrenar, el resultado es casi igual: F1 de 0,936 y 10 neumonías no detectadas.",
+  "examples": [
+    {
+      "file": "NORMAL2-IM-1155-0001.jpg",
+      "title": "Normal",
+      "label": "NORMAL",
+      "kind": null,
+      "expected_prob": 0.00012
+    },
+    {
+      "file": "IM-0317-0001.jpg",
+      "title": "Normal",
+      "label": "NORMAL",
+      "kind": null,
+      "expected_prob": 0.00013
+    },
+    {
+      "file": "person1718_bacteria_4538.jpg",
+      "title": "Neumonía bacteriana",
+      "label": "PNEUMONIA",
+      "kind": "bacteria",
+      "expected_prob": 0.99992
+    },
+    {
+      "file": "person1087_bacteria_3027.jpg",
+      "title": "Neumonía bacteriana",
+      "label": "PNEUMONIA",
+      "kind": "bacteria",
+      "expected_prob": 0.99977
+    },
+    {
+      "file": "person1396_virus_2399.jpg",
+      "title": "Neumonía viral",
+      "label": "PNEUMONIA",
+      "kind": "virus",
+      "expected_prob": 0.98949
+    },
+    {
+      "file": "person111_virus_212.jpg",
+      "title": "Viral · el modelo falla",
+      "label": "PNEUMONIA",
+      "kind": "virus",
+      "expected_prob": 0.02973
+    }
+  ]
+}

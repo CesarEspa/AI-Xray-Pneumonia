@@ -8,6 +8,9 @@ seguimiento completo de experimentos en **MLflow** y servida mediante una **API 
 **Proyecto Final Independiente** — Clase 4, Unidad 3 · Máster en IA & Data Science (DevSeniorCode)
 **Autor:** César Libardo España Salguero
 
+**Demo en línea:** https://cesarespa.github.io/Proyecto_DataScience_IA/ · el modelo corre en el navegador
+(la imagen no sale del equipo), con el umbral clínico y el mapa de activación de clase. Ver la sección 6b.
+
 > **Aviso:** este sistema es un proyecto académico de inteligencia artificial y **no
 > constituye un diagnóstico médico** ni sustituye la evaluación de un profesional de
 > la salud. El aviso se devuelve en cada respuesta de la API (campo `disclaimer`) y
@@ -95,8 +98,9 @@ models/aixray_model.keras + models/model_card.json
 API de inferencia (FastAPI: POST /predict, GET /health)
 ```
 
-No hay frontend: el entregable de "aplicación" es la API, que se prueba en `/docs`
-(Swagger), con `curl` o con `pytest`.
+El entregable de "aplicación" de la rúbrica es la API, que se prueba en `/docs` (Swagger),
+con `curl` o con `pytest`. Además hay una demo web que corre el mismo modelo en el navegador
+(sección 6b).
 
 ---
 
@@ -200,6 +204,40 @@ pytest tests/ -v
 
 ---
 
+## 6b. Demo en el navegador (`web/`)
+
+Publicada con GitHub Pages: https://cesarespa.github.io/Proyecto_DataScience_IA/
+
+- **Sin servidor:** el modelo se convierte a ONNX y corre con `onnxruntime-web`. La radiografía
+  no sale del equipo de quien la sube, y la demo no se "duerme" como un servidor gratuito.
+- **Mismo preprocesamiento:** `web/app.js` reimplementa `preprocess_image_bytes` (redimensionado
+  bilineal con antialias de `tf.image.resize` y `preprocess_input` de ResNet50).
+- **Mapa de activación (CAM):** con `GlobalAveragePooling2D -> Dense` el mapa es exacto: el promedio
+  de las 7x7 contribuciones más el sesgo es el logit. Muestra en qué zonas se apoyó el modelo, no
+  dónde está la lesión.
+- **Pesos en float16** (47 MB en lugar de 94 MB).
+
+Verificación, con `scripts/web/validate.py` sobre las 302 imágenes de test:
+
+| Versión | Diferencia máxima de probabilidad vs. Keras | Decisiones distintas |
+|---|---|---|
+| ONNX float32 | 0.000002 | 0 |
+| ONNX float16 (la publicada) | 0.006 | 0 |
+
+En el navegador, sobre los 6 ejemplos de la demo, la diferencia máxima frente a TensorFlow fue 0.0007.
+Con las JPEG originales del dataset (el entrenamiento usó copias reducidas a 448 px), el modelo da
+F1 0.936 y 10 falsos negativos, frente a 0.939 y 9 del reporte oficial.
+
+Regenerar (requiere además `tf2onnx onnx onnxruntime onnxconverter-common`):
+
+```bash
+python scripts/web/export_onnx.py . <salida>
+python scripts/web/validate.py . "<dataset>/Pediatric Chest X-ray Pneumonia" <salida>
+python scripts/web/examples.py . <salida>      # copia el modelo y los ejemplos a web/
+```
+
+---
+
 ## 7. Estructura
 
 ```text
@@ -222,7 +260,8 @@ AI-XRay/
 │   └── metrics.py             métricas, umbral clínico, figuras
 ├── api/                       main.py · schemas.py · model_service.py
 ├── tests/test_api.py
-├── scripts/relocate_mlflow.py
+├── scripts/relocate_mlflow.py · scripts/web/ (exportación a ONNX y verificación)
+├── web/                       demo en el navegador (GitHub Pages)
 ├── models/                    aixray_model.keras · model_card.json
 ├── reports/                   tablas y figuras del Executive Summary
 ├── mlflow.db · mlruns/        tracking de los 5 runs y Model Registry

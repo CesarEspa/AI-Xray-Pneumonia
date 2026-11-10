@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI-XRay · Demo</title>
+<meta name="description" content="Demo en el navegador del clasificador de neumonía en radiografías pediátricas de César España: ResNet50, umbral clínico y mapa de activación. Proyecto académico, no es un diagnóstico.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23090909'/%3E%3Cpath d='M32 14v36M20 22c6 2 6 8 0 10m24-10c-6 2-6 8 0 10M20 38c6 2 6 6 0 8m24-8c-6 2-6 6 0 8' stroke='%23e32b3c' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="https://cesarespa.github.io/CesarEspana-Portafolio/Analyst/analyst.html">César<span>España</span></a>
+  <nav>
+    <a href="#confianza">Qué tan confiable es</a>
+    <a href="https://github.com/CesarEspa/Proyecto_DataScience_IA" target="_blank" rel="noopener">Código ↗</a>
+  </nav>
+</header>
+
+<main>
+  <section class="intro">
+    <span class="label">AI-XRay · Master in AI &amp; Data Science</span>
+    <h1>Neumonía en<br><span>radiografías pediátricas</span></h1>
+    <p>ResNet50 con transfer learning, entrenada con radiografías de tórax de niños. Elige un ejemplo o sube una imagen:
+      el modelo corre completo en tu navegador, así que <b>la imagen no sale de tu equipo</b>.</p>
+    <p class="warn" role="note"><b>Proyecto académico.</b> No es un diagnóstico médico ni reemplaza la evaluación de un profesional de la salud.</p>
+  </section>
+
+  <section class="app" aria-label="Demo">
+    <div class="panel input">
+      <div class="panel-head"><span class="label">1 · Imagen</span><span class="status" id="status">Cargando modelo…</span></div>
+      <div class="progress" id="progress" aria-hidden="true"><i></i></div>
+
+      <label class="drop" id="drop">
+        <input type="file" id="file" accept="image/jpeg,image/png">
+        <strong>Sube una radiografía</strong>
+        <span>JPEG o PNG · arrastra aquí o toca para elegir</span>
+      </label>
+
+      <p class="sub">O prueba con imágenes del conjunto de test (no se usaron para entrenar):</p>
+      <div class="examples" id="examples"></div>
+    </div>
+
+    <div class="panel output" aria-live="polite">
+      <div class="panel-head"><span class="label">2 · Resultado</span><span class="status" id="timing"></span></div>
+
+      <div class="empty" id="empty">Elige una imagen para ver la predicción.</div>
+
+      <div class="result" id="result" hidden>
+        <div class="viewer">
+          <canvas id="view" aria-label="Radiografía analizada"></canvas>
+          <canvas id="heat" aria-hidden="true"></canvas>
+          <label class="toggle"><input type="checkbox" id="showCam" checked> Mapa de activación</label>
+        </div>
+
+        <div class="verdict">
+          <span class="label" id="truth"></span>
+          <h2 id="verdict"></h2>
+          <div class="meter" role="img" id="meter" aria-label="">
+            <div class="fill" id="fill"></div>
+            <div class="tick" id="tick"><span>umbral</span></div>
+          </div>
+          <div class="scale"><span>0</span><span id="probText"></span><span>1</span></div>
+          <p class="explain" id="explain"></p>
+          <p class="note" id="camNote"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="trust" id="confianza">
+    <div class="trust-head">
+      <span class="label">Qué tan confiable es</span>
+      <h2>Lo que mide y<br><span>lo que no.</span></h2>
+    </div>
+
+    <div class="trust-grid">
+      <article class="card">
+        <h3>En el conjunto de test</h3>
+        <p class="lead">302 radiografías que el modelo nunca vio, con pacientes separados del entrenamiento.</p>
+        <dl class="stats">
+          <div><dt>Sensibilidad</dt><dd>94,2%</dd></div>
+          <div><dt>Especificidad</dt><dd>93,2%</dd></div>
+          <div><dt>F1</dt><dd>0,939</dd></div>
+          <div><dt>AUC</dt><dd>0,987</dd></div>
+        </dl>
+        <table class="cm" aria-label="Matriz de confusión en test con el umbral clínico">
+          <thead><tr><th></th><th>Predice normal</th><th>Predice neumonía</th></tr></thead>
+          <tbody>
+            <tr><th>Normal (146)</th><td class="ok">136</td><td>10</td></tr>
+            <tr><th>Neumonía (156)</th><td class="bad">9</td><td class="ok">147</td></tr>
+          </tbody>
+        </table>
+      </article>
+
+      <article class="card">
+        <h3>Por qué el umbral es 0,585</h3>
+        <p>Pasar por alto una neumonía es peor que una falsa alarma, así que el umbral no es 0,5: es el más alto que,
+          en validación, detecta al menos el 95% de las neumonías. Se fijó antes de mirar el test.</p>
+        <p>En test detecta el 94,2%. De las 9 neumonías que no detecta, 7 son virales: sus patrones son más sutiles
+          que las consolidaciones bacterianas.</p>
+      </article>
+
+      <article class="card">
+        <h3>Sus límites</h3>
+        <ul>
+          <li>Todas las imágenes vienen de <b>un solo hospital</b> (Guangzhou, China), con niños de 1 a 5 años. No está validado en otros hospitales, y los modelos así suelen rendir bastante menos fuera de su origen.</li>
+          <li>Solo distingue normal de neumonía. Con cualquier otra imagen igual devolverá un número, que no significa nada.</li>
+          <li>El mapa muestra en qué zonas se apoyó el modelo, no dónde está la lesión.</li>
+        </ul>
+      </article>
+    </div>
+    <p class="verify" id="verify"></p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Datos: Kermany D, Goldbaum M, Cai W, et al. <i>Identifying Medical Diagnoses and Treatable Diseases by Image-Based Deep Learning</i>. Cell. 2018;172(5):1122-1131.
+    Imágenes de Kermany, Zhang y Goldbaum (2018), Mendeley Data v2, licencia CC BY 4.0.</p>
+  <p>Hecho por <a href="https://cesarespa.github.io/CesarEspana-Portafolio/">César España</a> · <a href="https://github.com/CesarEspa/Proyecto_DataScience_IA" target="_blank" rel="noopener">código y entrenamiento</a></p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
