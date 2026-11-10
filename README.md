@@ -215,14 +215,23 @@ Publicada con GitHub Pages: https://cesarespa.github.io/AI-Xray-Pneumonia/
 - **Mapa de activación (CAM):** con `GlobalAveragePooling2D -> Dense` el mapa es exacto: el promedio
   de las 7x7 contribuciones más el sesgo es el logit. Muestra en qué zonas se apoyó el modelo, no
   dónde está la lesión.
-- **Pesos en float16** (47 MB en lugar de 94 MB).
+- **Los 5 modelos del experimento**, cada uno con su umbral clínico y sus métricas oficiales (de `mlflow.db`).
+  Se elige el modelo en un menú, y un botón compara los 5 sobre la misma imagen.
+- **Imagen al azar del test:** toma una de las 302 radiografías de test, la clasifica, revela el diagnóstico
+  real y lleva la cuenta de aciertos del modelo elegido.
+- **Pesos en float16** (47 MB por modelo en lugar de 94 MB). Cada modelo se descarga solo cuando se usa y
+  queda guardado en el navegador.
 
-Verificación, con `scripts/web/validate.py` sobre las 302 imágenes de test:
+Verificación sobre las 302 imágenes de test, cada modelo ONNX float16 frente a su `.keras` original
+(`scripts/web/export_all.py`; en float32 la diferencia para la Var. A es 0.000002):
 
-| Versión | Diferencia máxima de probabilidad vs. Keras | Decisiones distintas |
-|---|---|---|
-| ONNX float32 | 0.000002 | 0 |
-| ONNX float16 (la publicada) | 0.006 | 0 |
+| Modelo | Umbral clínico | F1 val | F1 test | Diferencia máxima vs. Keras | Decisiones distintas |
+|---|---|---|---|---|---|
+| Var. A (elegido) | 0.585 | 0.962 | 0.939 | 0.006 | 0 |
+| Run 3 | 0.581 | 0.952 | 0.952 | 0.007 | 0 |
+| Run 1 | 0.429 | 0.940 | 0.918 | 0.004 | 0 |
+| Var. B | 0.354 | 0.937 | 0.916 | 0.004 | 0 |
+| Run 2 | 0.248 | 0.898 | 0.860 | 0.004 | 0 |
 
 En el navegador, sobre los 6 ejemplos de la demo, la diferencia máxima frente a TensorFlow fue 0.0007.
 Con las JPEG originales del dataset (el entrenamiento usó copias reducidas a 448 px), el modelo da
@@ -231,9 +240,10 @@ F1 0.936 y 10 falsos negativos, frente a 0.939 y 9 del reporte oficial.
 Regenerar (requiere además `tf2onnx onnx onnxruntime onnxconverter-common`):
 
 ```bash
-python scripts/web/export_onnx.py . <salida>
+python scripts/web/export_all.py "<dataset>/Pediatric Chest X-ray Pneumonia" <temporal>   # 5 modelos + imágenes de test
+python scripts/web/export_onnx.py . <salida>                                               # solo la Var. A, con float32
 python scripts/web/validate.py . "<dataset>/Pediatric Chest X-ray Pneumonia" <salida>
-python scripts/web/examples.py . <salida>      # copia el modelo y los ejemplos a web/
+python scripts/web/examples.py . <salida>                                                  # ejemplos destacados
 ```
 
 ---

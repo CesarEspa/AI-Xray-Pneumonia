@@ -1,0 +1,164 @@
+{
+  "models": [
+    {
+      "key": "var_a",
+      "label": "Var. A · fine-tuning en 2 fases",
+      "description": "El modelo elegido. Parte del Run 1 ya entrenado y ajusta las últimas capas de ResNet50.",
+      "file": "model/var_a.onnx",
+      "size": 47062597,
+      "threshold": 0.5853266716003418,
+      "chosen": true,
+      "learning_rate": "1e-05",
+      "dropout": "0.3",
+      "val": {
+        "f1_score": 0.9617834394904459,
+        "recall": 0.967948717948718,
+        "specificity": 0.954248366013072,
+        "auc": 0.9913691972515501
+      },
+      "test": {
+        "f1_score": 0.939297124600639,
+        "recall": 0.9423076923076923,
+        "specificity": 0.9315068493150684,
+        "auc": 0.986652616789603,
+        "tp": 147.0,
+        "fp": 10.0,
+        "tn": 136.0,
+        "fn": 9.0
+      },
+      "verification": {
+        "max_abs_diff": 0.005937457084655762,
+        "decision_changes": 0,
+        "n": 302
+      }
+    },
+    {
+      "key": "run3",
+      "label": "Run 3 · fine-tuning en 1 paso",
+      "description": "Ajusta las últimas capas de ResNet50 desde una cabeza aleatoria.",
+      "file": "model/run3.onnx",
+      "size": 47062632,
+      "threshold": 0.5809526443481445,
+      "chosen": false,
+      "learning_rate": "1e-05",
+      "dropout": "0.3",
+      "val": {
+        "f1_score": 0.952076677316294,
+        "recall": 0.9551282051282052,
+        "specificity": 0.9477124183006536,
+        "auc": 0.9906569465392995
+      },
+      "test": {
+        "f1_score": 0.9517684887459807,
+        "recall": 0.9487179487179487,
+        "specificity": 0.952054794520548,
+        "auc": 0.9891113452757289,
+        "tp": 148.0,
+        "fp": 7.0,
+        "tn": 139.0,
+        "fn": 8.0
+      },
+      "verification": {
+        "max_abs_diff": 0.00651472806930542,
+        "decision_changes": 0,
+        "n": 302
+      }
+    },
+    {
+      "key": "run1",
+      "label": "Run 1 · base congelada",
+      "description": "Línea base: ResNet50 congelada, solo se entrena la capa final.",
+      "file": "model/run1.onnx",
+      "size": 47009972,
+      "threshold": 0.4286676049232483,
+      "chosen": false,
+      "learning_rate": "0.001",
+      "dropout": "0.3",
+      "val": {
+        "f1_score": 0.9400630914826499,
+        "recall": 0.9551282051282052,
+        "specificity": 0.9215686274509803,
+        "auc": 0.9822775263951735
+      },
+      "test": {
+        "f1_score": 0.9177215189873418,
+        "recall": 0.9294871794871795,
+        "specificity": 0.8972602739726028,
+        "auc": 0.9791886195995786,
+        "tp": 145.0,
+        "fp": 15.0,
+        "tn": 131.0,
+        "fn": 11.0
+      },
+      "verification": {
+        "max_abs_diff": 0.0041429102420806885,
+        "decision_changes": 0,
+        "n": 302
+      }
+    },
+    {
+      "key": "var_b",
+      "label": "Var. B · Run 1 sin flip",
+      "description": "Igual al Run 1, pero sin voltear las imágenes al aumentar datos.",
+      "file": "model/var_b.onnx",
+      "size": 47010220,
+      "threshold": 0.35390663146972656,
+      "chosen": false,
+      "learning_rate": "0.001",
+      "dropout": "0.3",
+      "val": {
+        "f1_score": 0.9371069182389937,
+        "recall": 0.9551282051282052,
+        "specificity": 0.9150326797385621,
+        "auc": 0.9812300988771577
+      },
+      "test": {
+        "f1_score": 0.9158878504672897,
+        "recall": 0.9423076923076923,
+        "specificity": 0.8767123287671232,
+        "auc": 0.9787056550755181,
+        "tp": 147.0,
+        "fp": 18.0,
+        "tn": 128.0,
+        "fn": 9.0
+      },
+      "verification": {
+        "max_abs_diff": 0.003811657428741455,
+        "decision_changes": 0,
+        "n": 302
+      }
+    },
+    {
+      "key": "run2",
+      "label": "Run 2 · más regularización",
+      "description": "Base congelada con dropout 0,5 y learning rate 10 veces menor.",
+      "file": "model/run2.onnx",
+      "size": 47010230,
+      "threshold": 0.2479284405708313,
+      "chosen": false,
+      "learning_rate": "0.0001",
+      "dropout": "0.5",
+      "val": {
+        "f1_score": 0.8975903614457831,
+        "recall": 0.9551282051282052,
+        "specificity": 0.8235294117647058,
+        "auc": 0.9669012904307022
+      },
+      "test": {
+        "f1_score": 0.8596491228070176,
+        "recall": 0.9423076923076923,
+        "specificity": 0.7328767123287672,
+        "auc": 0.9632068844397612,
+        "tp": 147.0,
+        "fp": 39.0,
+        "tn": 107.0,
+        "fn": 9.0
+      },
+      "verification": {
+        "max_abs_diff": 0.003843069076538086,
+        "decision_changes": 0,
+        "n": 302
+      }
+    }
+  ]
+}

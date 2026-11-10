@@ -4,7 +4,6 @@ que da el modelo Keras original sobre ESOS archivos (para verificar la web contr
 Uso: python examples.py <carpeta AI-XRay> <carpeta onnx con test_predictions.csv y metrics.json>
 """
 import json
-import shutil
 import sys
 from pathlib import Path
 
@@ -17,8 +16,7 @@ project, onnx_dir = Path(sys.argv[1]), Path(sys.argv[2])
 web = project / "web"
 ex_dir = web / "examples"
 ex_dir.mkdir(parents=True, exist_ok=True)
-(web / "model").mkdir(exist_ok=True)
-shutil.copyfile(onnx_dir / "aixray_fp16.onnx", web / "model" / "aixray.onnx")
+# Los modelos de la web los genera export_all.py (web/model/<clave>.onnx).
 
 df = pd.read_csv(onnx_dir / "test_predictions.csv")
 m = json.loads((onnx_dir / "metrics.json").read_text())

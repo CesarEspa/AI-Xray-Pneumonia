@@ -30,8 +30,9 @@
   <section class="intro">
     <span class="label">AI-XRay · Master in AI &amp; Data Science</span>
     <h1>Neumonía en<br><span>radiografías pediátricas</span></h1>
-    <p>ResNet50 con transfer learning, entrenada con radiografías de tórax de niños. Elige un ejemplo o sube una imagen:
-      el modelo corre completo en tu navegador, así que <b>la imagen no sale de tu equipo</b>.</p>
+    <p>Cinco modelos ResNet50 con transfer learning, entrenados con radiografías de tórax de niños. Elige un modelo,
+      sube una imagen o pide una al azar del conjunto de test, y compara cómo responde cada uno. Todo corre en tu navegador,
+      así que <b>la imagen no sale de tu equipo</b>.</p>
     <p class="warn" role="note"><b>Proyecto académico.</b> No es un diagnóstico médico ni reemplaza la evaluación de un profesional de la salud.</p>
   </section>
 
@@ -40,13 +41,22 @@
       <div class="panel-head"><span class="label">1 · Imagen</span><span class="status" id="status">Cargando modelo…</span></div>
       <div class="progress" id="progress" aria-hidden="true"><i></i></div>
 
+      <label class="field" for="modelSel">Modelo</label>
+      <select id="modelSel" disabled></select>
+      <p class="model-info" id="modelInfo"></p>
+
       <label class="drop" id="drop">
         <input type="file" id="file" accept="image/jpeg,image/png">
         <strong>Sube una radiografía</strong>
         <span>JPEG o PNG · arrastra aquí o toca para elegir</span>
       </label>
 
-      <p class="sub">O prueba con imágenes del conjunto de test (no se usaron para entrenar):</p>
+      <div class="random">
+        <button type="button" class="btn" id="randomBtn" disabled>Imagen al azar del test</button>
+        <span class="score" id="score" aria-live="polite"></span>
+      </div>
+
+      <p class="sub">O elige uno de estos ejemplos del conjunto de test (ninguna de estas imágenes se usó para entrenar):</p>
       <div class="examples" id="examples"></div>
     </div>
 
@@ -74,6 +84,15 @@
           <p class="note" id="camNote"></p>
         </div>
       </div>
+
+      <div class="compare" id="compareBox" hidden>
+        <button type="button" class="btn" id="compareBtn">Comparar los 5 modelos con esta imagen</button>
+        <p class="note" id="compareNote"></p>
+        <table class="cmp" id="cmpTable" hidden>
+          <thead><tr><th>Modelo</th><th>Probabilidad</th><th>Umbral</th><th>Predice</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -85,8 +104,8 @@
 
     <div class="trust-grid">
       <article class="card">
-        <h3>En el conjunto de test</h3>
-        <p class="lead">302 radiografías que el modelo nunca vio, con pacientes separados del entrenamiento.</p>
+        <h3>Var. A, el modelo elegido, en test</h3>
+        <p class="lead">302 radiografías que ningún modelo vio, con pacientes separados del entrenamiento.</p>
         <dl class="stats">
           <div><dt>Sensibilidad</dt><dd>94,2%</dd></div>
           <div><dt>Especificidad</dt><dd>93,2%</dd></div>
@@ -103,11 +122,11 @@
       </article>
 
       <article class="card">
-        <h3>Por qué el umbral es 0,585</h3>
-        <p>Pasar por alto una neumonía es peor que una falsa alarma, así que el umbral no es 0,5: es el más alto que,
-          en validación, detecta al menos el 95% de las neumonías. Se fijó antes de mirar el test.</p>
-        <p>En test detecta el 94,2%. De las 9 neumonías que no detecta, 7 son virales: sus patrones son más sutiles
-          que las consolidaciones bacterianas.</p>
+        <h3>Por qué cada modelo tiene su umbral</h3>
+        <p>Pasar por alto una neumonía es peor que una falsa alarma, así que el umbral no es 0,5: para cada modelo es el
+          más alto que, en validación, detecta al menos el 95% de las neumonías. Se fijó antes de mirar el test.</p>
+        <p>Con la Var. A (umbral 0,585), en test detecta el 94,2%. De las 9 neumonías que no detecta, 7 son virales:
+          sus patrones son más sutiles que las consolidaciones bacterianas.</p>
       </article>
 
       <article class="card">
@@ -119,6 +138,19 @@
         </ul>
       </article>
     </div>
+
+    <article class="card models-card">
+      <h3>Los cinco modelos</h3>
+      <p>El modelo se eligió por su F1 en <b>validación</b>, antes de mirar el test. En test el Run 3 sale un poco mejor,
+        pero con 302 imágenes la diferencia no es distinguible: el bootstrap del proyecto da un intervalo del 95% que incluye
+        el cero. Cambiar de modelo después de ver el test sería ajustarlo al test.</p>
+      <div class="table-wrap">
+        <table class="cmp" id="modelsTable">
+          <thead><tr><th>Modelo</th><th>F1 validación</th><th>F1 test</th><th>Sensibilidad test</th><th>Especificidad test</th><th>Umbral</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </article>
     <p class="verify" id="verify"></p>
   </section>
 </main>
