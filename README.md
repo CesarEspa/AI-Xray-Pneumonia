@@ -8,7 +8,7 @@ seguimiento completo de experimentos en **MLflow** y servida mediante una **API 
 **Proyecto Final Independiente** — Clase 4, Unidad 3 · Máster en IA & Data Science (DevSeniorCode)
 **Autor:** César Libardo España Salguero
 
-**Demo en línea:** https://cesarespa.github.io/Proyecto_DataScience_IA/ · el modelo corre en el navegador
+**Demo en línea:** https://cesarespa.github.io/AI-Xray-Pneumonia/ · el modelo corre en el navegador
 (la imagen no sale del equipo), con el umbral clínico y el mapa de activación de clase. Ver la sección 6b.
 
 > **Aviso:** este sistema es un proyecto académico de inteligencia artificial y **no
@@ -206,7 +206,7 @@ pytest tests/ -v
 
 ## 6b. Demo en el navegador (`web/`)
 
-Publicada con GitHub Pages: https://cesarespa.github.io/Proyecto_DataScience_IA/
+Publicada con GitHub Pages: https://cesarespa.github.io/AI-Xray-Pneumonia/
 
 - **Sin servidor:** el modelo se convierte a ONNX y corre con `onnxruntime-web`. La radiografía
   no sale del equipo de quien la sube, y la demo no se "duerme" como un servidor gratuito.
