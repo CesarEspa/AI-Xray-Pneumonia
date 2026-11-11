@@ -1,6 +1,7 @@
 """Exporta los 5 runs de MLflow a ONNX (float16) para la demo web y los verifica contra Keras.
 
-Para cada run escribe web/model/<clave>.onnx y, en web/model/models.json, sus métricas oficiales
+Convierte y verifica los 5 runs, pero la demo publica solo el elegido (la Var. A) en web/model/var_a.onnx.
+En web/model/models.json guarda, para los 5, sus métricas oficiales
 (tomadas de mlflow.db), su umbral clínico y el resultado de la verificación en las 302 imágenes
 de test. También prepara web/test/ con las 302 imágenes reducidas para la "imagen al azar".
 
@@ -101,15 +102,16 @@ for key, run_name, label, desc in RUNS:
 
     fp32 = TMP / f"{key}_fp32.onnx"
     tf2onnx.convert.from_function(serve, input_signature=serve.input_signature, opset=17, output_path=str(fp32))
-    onnx.save(float16.convert_float_to_float16(onnx.load(str(fp32)), keep_io_types=True), str(WEB / "model" / f"{key}.onnx"))
+    target = (WEB / "model" if key == "var_a" else TMP) / f"{key}.onnx"   # la demo publica solo la Var. A
+    onnx.save(float16.convert_float_to_float16(onnx.load(str(fp32)), keep_io_types=True), str(target))
 
-    sess = ort.InferenceSession(str(WEB / "model" / f"{key}.onnx"), providers=["CPUExecutionProvider"])
+    sess = ort.InferenceSession(str(target), providers=["CPUExecutionProvider"])
     k_p = np.array([float(model.predict_on_batch(x).ravel()[0]) for x in inputs])
     o_p = np.array([float(sess.run(["prob"], {"input": x})[0].ravel()[0]) for x in inputs])
     thr = float(metrics["threshold_clinical"])
     entry = {
         "key": key, "label": label, "description": desc, "file": f"model/{key}.onnx",
-        "size": (WEB / "model" / f"{key}.onnx").stat().st_size,
+        "size": target.stat().st_size,
         "threshold": thr, "chosen": key == "var_a",
         "learning_rate": params.get("learning_rate"), "dropout": params.get("dropout"),
         "val": {k: metrics[f"clin_val_{k}"] for k in ("f1_score", "recall", "specificity", "auc")},

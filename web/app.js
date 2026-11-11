@@ -3,9 +3,10 @@
  * Reproduce el preprocesamiento de src/preprocessing.py::preprocess_image_bytes:
  *   decodificar a RGB -> tf.image.resize(224x224, bilineal, antialias=True) -> preprocess_input
  *   de ResNet50 (RGB -> BGR y resta de la media de ImageNet, sin escalar a 0-1).
- * Cada modelo ONNX devuelve la probabilidad de neumonía y el mapa de activación de clase (7x7),
- * que con GlobalAveragePooling + Dense es exacto: promedio del mapa + sesgo = logit.
- * Los modelos y sus umbrales clínicos vienen de model/models.json (generado por scripts/web/export_all.py).
+ * El modelo ONNX (la Var. A, el elegido por validación) devuelve la probabilidad de neumonía y el mapa de
+ * activación de clase (7x7), que con GlobalAveragePooling + Dense es exacto: promedio del mapa + sesgo = logit.
+ * Su umbral clínico y las métricas de los 5 modelos del proyecto vienen de model/models.json
+ * (generado por scripts/web/export_all.py).
  */
 (() => {
   const SIZE = 224;
@@ -20,9 +21,9 @@
   const fmtProb = (p) => (p > 0.999 ? 'más de 0,999' : p < 0.001 ? 'menos de 0,001' : fmt(p));
   const mb = (b) => `${Math.round(b / 1048576)} MB`;
 
-  let models = [];            // de models.json
-  let current = null;         // modelo en uso
-  const sessions = new Map(); // clave -> InferenceSession (se guardan pocas para no agotar memoria)
+  let models = [];            // los 5 del proyecto, de models.json (solo para la tabla)
+  let current = null;         // el modelo de la demo (Var. A)
+  const sessions = new Map(); // archivo -> InferenceSession
   let testItems = [];
   let busy = false;
   let last = null;            // { input, img, example }
@@ -59,26 +60,19 @@
     return buf;
   }
 
-  // Las sesiones se guardan por archivo: "Tu modelo" comparte la base congelada (model/base.onnx).
   async function getSession(m, statusPrefix = '') {
     if (sessions.has(m.file)) return sessions.get(m.file);
     const bar = $('progress');
     bar.classList.remove('done');
     const buf = await fetchModel(m, (got, total) => {
-      $('status').textContent = `${statusPrefix}Descargando ${m.short} · ${mb(got)}${total ? ` de ${mb(total)}` : ''}`;
+      $('status').textContent = `${statusPrefix}Descargando el modelo · ${mb(got)}${total ? ` de ${mb(total)}` : ''}`;
       if (total) bar.firstElementChild.style.width = `${(100 * got / total).toFixed(1)}%`;
     });
-    $('status').textContent = `${statusPrefix}Preparando ${m.short}…`;
+    $('status').textContent = `${statusPrefix}Preparando el modelo…`;
     const s = await ort.InferenceSession.create(buf, { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
     sessions.set(m.file, s);
     bar.classList.add('done');
     return s;
-  }
-
-  async function releaseExcept(keepFiles) {
-    for (const [k, s] of sessions) {
-      if (!keepFiles.includes(k)) { try { await s.release(); } catch (_) { /* ya liberada */ } sessions.delete(k); }
-    }
   }
 
   /* ---------- redimensionado igual a tf.image.resize(antialias=True) ---------- */
@@ -148,19 +142,6 @@
     const t0 = performance.now();
     const out = await session.run({ [session.inputNames[0]]: new ort.Tensor('float32', input, [1, SIZE, SIZE, 3]) });
     const ts = Object.values(out);
-    if (m.head) {
-      // "Tu modelo": base congelada (7x7x2048) + la cabeza entrenada en el laboratorio.
-      // Con GlobalAveragePooling -> Dense, el logit es el promedio del mapa de activación más el sesgo.
-      const f = ts[0].data, { w, b } = m.head, D = w.length;
-      const cam = new Float32Array(49);
-      let sum = 0;
-      for (let c = 0; c < 49; c++) {
-        let s = 0;
-        for (let k = 0; k < D; k++) s += f[c * D + k] * w[k];
-        cam[c] = s; sum += s;
-      }
-      return { prob: 1 / (1 + Math.exp(-(sum / 49 + b))), cam, ms: performance.now() - t0 };
-    }
     return {
       prob: ts.find((t) => t.data.length === 1).data[0],
       cam: Float32Array.from(ts.find((t) => t.data.length === 49).data),
@@ -221,7 +202,6 @@
     const m = current;
     $('empty').hidden = true;
     $('result').hidden = false;
-    $('compareBox').hidden = false;
     drawImage(r.img.bmp);
     last.cam = r.cam;
     drawCam(r.cam);
@@ -235,8 +215,8 @@
     $('probText').textContent = `p = ${fmtProb(r.prob)}`;
     $('meter').setAttribute('aria-label', `Probabilidad de neumonía ${fmtProb(r.prob)}, umbral ${fmt(m.threshold)}`);
 
-    let text = `${m.short} estima una probabilidad de neumonía de ${fmtProb(r.prob)}, ${pos ? 'por encima' : 'por debajo'} de su umbral de ${fmt(m.threshold)}.`;
-    if (Math.abs(r.prob - m.threshold) < 0.15) text += ' Está cerca del umbral, así que es un caso dudoso para este modelo.';
+    let text = `El modelo estima una probabilidad de neumonía de ${fmtProb(r.prob)}, ${pos ? 'por encima' : 'por debajo'} del umbral de ${fmt(m.threshold)}.`;
+    if (Math.abs(r.prob - m.threshold) < 0.15) text += ' Está cerca del umbral, así que es un caso dudoso para el modelo.';
     $('explain').textContent = text;
     $('camNote').textContent = Math.max(...r.cam) > 0
       ? 'El mapa resalta las zonas que más empujaron la predicción hacia neumonía. Muestra en qué se apoyó el modelo, no dónde está la lesión.'
@@ -250,7 +230,7 @@
       if (example.random) {
         score.total += 1;
         score.hits += hit ? 1 : 0;
-        $('score').textContent = `${m.short}: ${score.hits} de ${score.total} aciertos`;
+        $('score').textContent = `${score.hits} de ${score.total} aciertos`;
       }
     } else {
       truth.textContent = 'Imagen subida';
@@ -261,14 +241,13 @@
 
   function setBusy(on) {
     busy = on;
-    document.querySelectorAll('.ex, #randomBtn, #compareBtn, #modelSel').forEach((b) => { b.disabled = on; });
+    document.querySelectorAll('.ex, #randomBtn').forEach((b) => { b.disabled = on; });
   }
 
   function showError(msg) {
     $('timing').textContent = '';
     $('empty').hidden = false;
     $('result').hidden = true;
-    $('compareBox').hidden = true;
     $('empty').textContent = msg;
   }
 
@@ -277,30 +256,18 @@
     setBusy(true);
     document.querySelectorAll('.ex').forEach((b) => b.classList.toggle('active', b === button));
     $('timing').textContent = 'Analizando…';
-    $('cmpTable').hidden = true;
-    $('compareNote').textContent = '';
     try {
       const img = await decode(blob);
       const input = preprocess(img.data, img.w, img.h);
       last = { input, img, example };
       show({ img, ...(await infer(current, await getSession(current), input)) }, example);
-      $('status').textContent = `${current.short} listo`;
+      $('status').textContent = 'Modelo listo';
     } catch (e) {
       console.error(e);
       showError('No se pudo leer esa imagen. Usa un JPEG o PNG.');
     } finally {
       setBusy(false);
     }
-  }
-
-  async function rerunCurrent() {   // al cambiar de modelo, vuelve a clasificar la imagen que está en pantalla
-    if (!last) return;
-    setBusy(true);
-    try {
-      const r = await infer(current, await getSession(current), last.input);
-      show({ img: last.img, ...r }, last.example && { ...last.example, random: false });
-      $('status').textContent = `${current.short} listo`;
-    } finally { setBusy(false); }
   }
 
   function handleFile(file) {
@@ -310,79 +277,17 @@
     classify(file, null, null);
   }
 
-  /* ---------- modelos ---------- */
-  function describe(m) {
-    $('modelInfo').innerHTML = `${m.description} Umbral ${fmt(m.threshold)} · F1 en test ${fmt(m.test.f1_score)} · ${mb(m.size)}.`;
-  }
-
-  async function selectModel(key) {
-    current = models.find((m) => m.key === key);
-    describe(current);
-    score = { hits: 0, total: 0 };
-    $('score').textContent = '';
-    setBusy(true);
-    try {
-      await getSession(current);
-      await releaseExcept([current.file]);
-      $('status').textContent = `${current.short} listo`;
-    } catch (e) {
-      console.error(e);
-      $('status').textContent = 'No se pudo cargar el modelo';
-    } finally { setBusy(false); }
-    await rerunCurrent();
-  }
-
-  async function compareAll() {
-    if (busy || !last) return;
-    setBusy(true);
-    const table = $('cmpTable');
-    const body = table.querySelector('tbody');
-    body.innerHTML = '';
-    const pending = [...new Map(models.filter((m) => !sessions.has(m.file)).map((m) => [m.file, m])).values()];
-    $('compareNote').textContent = pending.length
-      ? `Descarga ${mb(pending.reduce((a, m) => a + m.size, 0))} la primera vez; después quedan guardados en tu navegador.`
-      : '';
-    const rows = [];
-    try {
-      for (const m of models) {
-        const s = await getSession(m, 'Comparando · ');
-        const r = await infer(m, s, last.input);
-        rows.push({ m, prob: r.prob });
-        if (m.file !== current.file) await releaseExcept([current.file]);   // uno a la vez para no agotar memoria
-      }
-      for (const { m, prob } of rows) {
-        const pos = prob >= m.threshold;
-        const tr = document.createElement('tr');
-        if (m.key === current.key) tr.className = 'current';
-        tr.innerHTML = `<td>${m.short}</td><td>${fmtProb(prob)}</td><td>${fmt(m.threshold)}</td><td class="${pos ? 'pos' : 'neg'}">${pos ? 'Neumonía' : 'Normal'}</td>`;
-        body.appendChild(tr);
-      }
-      table.hidden = false;
-      const votes = rows.filter((r) => r.prob >= r.m.threshold).length;
-      let note = votes === 0 || votes === rows.length
-        ? `Los ${rows.length} modelos coinciden.`
-        : `${votes} de ${rows.length} modelos dicen neumonía: es una imagen en la que los modelos no se ponen de acuerdo.`;
-      if (last.example) note += ` Diagnóstico real: ${realLabel(last.example)}.`;
-      $('compareNote').textContent = note;
-      $('status').textContent = `${current.short} listo`;
-    } catch (e) {
-      console.error(e);
-      $('compareNote').textContent = 'No se pudo completar la comparación. Revisa tu conexión e inténtalo de nuevo.';
-    } finally { setBusy(false); }
-  }
-
   function fillModelsTable() {
     const body = $('modelsTable').querySelector('tbody');
     for (const m of models) {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${m.short}${m.chosen ? ' · elegido' : ''}</td><td>${fmt(m.val.f1_score)}</td><td>${fmt(m.test.f1_score)}</td>`
+      tr.innerHTML = `<td>${m.short}${m.chosen ? ' · el de la demo' : ''}</td><td>${fmt(m.val.f1_score)}</td><td>${fmt(m.test.f1_score)}</td>`
         + `<td>${pct(m.test.recall)}</td><td>${pct(m.test.specificity)}</td><td>${fmt(m.threshold)}</td>`;
       body.appendChild(tr);
     }
-    const maxDiff = Math.max(...models.map((m) => m.verification.max_abs_diff));
-    const changes = models.reduce((a, m) => a + m.verification.decision_changes, 0);
-    $('verify').textContent = `Comprobado: cada modelo, convertido para el navegador, da ${changes === 0 ? 'la misma decisión' : 'casi siempre la misma decisión'} `
-      + `que su versión original de TensorFlow en las ${models[0].verification.n} imágenes de test (diferencia máxima de probabilidad: ${fmt(maxDiff)}). `
+    const v = current.verification;
+    $('verify').textContent = `Comprobado: el modelo, convertido para el navegador, da ${v.decision_changes === 0 ? 'la misma decisión' : 'casi siempre la misma decisión'} `
+      + `que su versión original de TensorFlow en las ${v.n} imágenes de test (diferencia máxima de probabilidad: ${fmt(v.max_abs_diff)}). `
       + 'Las cifras son las del proyecto, calculadas con las copias reducidas a 448 px que se usaron al entrenar.';
   }
 
@@ -396,15 +301,9 @@
     models = md.models.map((m) => ({ ...m, short: m.label.split(' · ')[0] }));
     testItems = tj;
 
-    const sel = $('modelSel');
-    for (const m of models) {
-      const o = document.createElement('option');
-      o.value = m.key;
-      o.textContent = `${m.label}${m.chosen ? ' (elegido)' : ''} · F1 test ${fmt(m.test.f1_score)}`;
-      sel.appendChild(o);
-    }
-    sel.addEventListener('change', () => selectModel(sel.value));
+    current = models.find((m) => m.chosen);
     fillModelsTable();
+    $('modelInfo').textContent = `Modelo: ${current.label}, el elegido por validación · umbral clínico ${fmt(current.threshold)} · ${mb(current.size)} la primera vez.`;
 
     const box = $('examples');
     for (const e of ex.examples) {
@@ -417,11 +316,8 @@
       box.appendChild(b);
     }
 
-    current = models.find((m) => m.chosen) || models[0];
-    sel.value = current.key;
-    describe(current);
     await getSession(current);
-    $('status').textContent = `${current.short} listo`;
+    $('status').textContent = 'Modelo listo';
     setBusy(false);
   }
 
@@ -430,7 +326,6 @@
     const blob = await (await fetch(`test/${item.file}`)).blob();
     classify(blob, { ...item, random: true }, null);
   });
-  $('compareBtn').addEventListener('click', compareAll);
   $('file').addEventListener('change', (e) => handleFile(e.target.files[0]));
   const drop = $('drop');
   ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
@@ -440,18 +335,5 @@
 
   init().catch((e) => { $('status').textContent = 'No se pudo cargar el modelo'; console.error(e); });
 
-  // El laboratorio (lab.js) registra aquí el modelo que entrena el visitante.
-  function registerCustom(custom) {
-    models = models.filter((m) => m.key !== 'custom').concat([custom]);
-    const sel = $('modelSel');
-    let o = sel.querySelector('option[value="custom"]');
-    if (!o) { o = document.createElement('option'); o.value = 'custom'; sel.appendChild(o); }
-    o.textContent = `${custom.label} · F1 test ${fmt(custom.test.f1_score)}`;
-    $('compareBtn').textContent = `Comparar los ${models.length} modelos con esta imagen`;
-    sel.value = 'custom';
-    document.querySelector('.app').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    return selectModel('custom');
-  }
-
-  window.__aixray = { predict, ready: () => !!current && sessions.has(current.file), models: () => models, registerCustom, fmt };
+  window.__aixray = { predict, ready: () => !!current && sessions.has(current.file) };   // usado para verificar contra TensorFlow
 })();

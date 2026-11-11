@@ -215,22 +215,14 @@ Publicada con GitHub Pages: https://cesarespa.github.io/AI-Xray-Pneumonia/
 - **Mapa de activación (CAM):** con `GlobalAveragePooling2D -> Dense` el mapa es exacto: el promedio
   de las 7x7 contribuciones más el sesgo es el logit. Muestra en qué zonas se apoyó el modelo, no
   dónde está la lesión.
-- **Los 5 modelos del experimento**, cada uno con su umbral clínico y sus métricas oficiales (de `mlflow.db`).
-  Se elige el modelo en un menú, y un botón compara los 5 sobre la misma imagen.
+- **Un solo modelo, el elegido:** la Var. A, seleccionada por F1 de validación antes de mirar el test. La página
+  muestra la tabla de los 5 runs (de `mlflow.db`) para explicar esa elección.
 - **Imagen al azar del test:** toma una de las 302 radiografías de test, la clasifica, revela el diagnóstico
-  real y lleva la cuenta de aciertos del modelo elegido.
-- **Laboratorio de entrenamiento:** reproduce el Run 1 en el navegador. La ResNet50 de ImageNet queda
-  congelada (sus características de las 2.000 imágenes vienen precalculadas en `web/lab/features.bin`) y se
-  entrena solo la cabeza (2.049 parámetros) con las épocas, el learning rate y el dropout que elija el
-  visitante, como en `src/train.py`: Adam, lotes de 32, `class_weight` balanceado, EarlyStopping (paciencia 4,
-  restaura los mejores pesos) y ReduceLROnPlateau. Muestra el progreso, el tiempo restante y las curvas;
-  calcula el umbral clínico en validación y evalúa en test. El modelo entrenado se puede usar para clasificar
-  y entra en la comparación. A diferencia del Run 1 original, no hay aumento de datos.
-- **Pesos en float16** (47 MB por modelo en lugar de 94 MB). Cada modelo se descarga solo cuando se usa y
-  queda guardado en el navegador.
+  real y lleva la cuenta de aciertos.
+- **Pesos en float16** (47 MB en lugar de 94 MB). Se descarga la primera vez y queda guardado en el navegador.
 
 Verificación sobre las 302 imágenes de test, cada modelo ONNX float16 frente a su `.keras` original
-(`scripts/web/export_all.py`; en float32 la diferencia para la Var. A es 0.000002):
+(`scripts/web/export_all.py` convierte y verifica los 5, y publica solo la Var. A; en float32 su diferencia es 0.000002):
 
 | Modelo | Umbral clínico | F1 val | F1 test | Diferencia máxima vs. Keras | Decisiones distintas |
 |---|---|---|---|---|---|
@@ -244,18 +236,10 @@ En el navegador, sobre los 6 ejemplos de la demo, la diferencia máxima frente a
 Con las JPEG originales del dataset (el entrenamiento usó copias reducidas a 448 px), el modelo da
 F1 0.936 y 10 falsos negativos, frente a 0.939 y 9 del reporte oficial.
 
-Verificación del laboratorio (`scripts/web/export_lab.py`): la base del Run 1 es idéntica a ResNet50 de
-ImageNet; la cabeza oficial del Run 1 sobre las características precalculadas reproduce al modelo completo
-(diferencia 6e-8, y 0.0001 con las características en float16), y en el navegador da la misma matriz de
-confusión en test que en Python (F1 0.915 con las JPEG originales, frente a 0.918 del reporte). Un
-entrenamiento de 10 épocas con la configuración del Run 1 tarda alrededor de 1 segundo y da un F1 en test
-del mismo orden.
-
 Regenerar (requiere además `tf2onnx onnx onnxruntime onnxconverter-common`):
 
 ```bash
-python scripts/web/export_all.py "<dataset>/Pediatric Chest X-ray Pneumonia" <temporal>   # 5 modelos + imágenes de test
-python scripts/web/export_lab.py "<dataset>/Pediatric Chest X-ray Pneumonia" <temporal>   # base congelada + características
+python scripts/web/export_all.py "<dataset>/Pediatric Chest X-ray Pneumonia" <temporal>   # Var. A + tabla de los 5 + imágenes de test
 python scripts/web/export_onnx.py . <salida>                                               # solo la Var. A, con float32
 python scripts/web/validate.py . "<dataset>/Pediatric Chest X-ray Pneumonia" <salida>
 python scripts/web/examples.py . <salida>                                                  # ejemplos destacados
